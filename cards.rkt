@@ -2,6 +2,17 @@
 ; cards.rkt
 ; AndrewJ 2018-09-06
 
+; Imports
+(require racket/hash)
+(require/typed hash-ext ; Annotate untyped package
+               [hash-add (-> Hand Hand Hand)]
+               [hash-mul (-> Hand Hand Hand)]
+               [hash-sum (-> Hand Integer)])
+
+; Exports
+(provide (all-defined-out))
+
+;-----------------------
 ; Cards are:
 ; - Blacksmith/Wild Boar -> Blk
 ; - Warrior/Bear         -> War
@@ -10,51 +21,32 @@
 ; - Merchant/Lynx        -> Mer
 ; - Scout/Wolf           -> Sct
 
-(require racket/hash)
-
-; Annotate untyped package
-(require/typed hash-ext
-               [hash-add (-> Hand Hand Hand)]
-               [hash-mul (-> Hand Hand Hand)]
-               [hash-sum (-> Hand Integer)])
-
-(provide score
-         scores)
-
-;-----------------------
-; Card :: (Hash Symbol Integer)
 (define-type Card (U 'Blk 'War 'Brd 'Sea 'Mer 'Sct))
 (define card-types '(Blk War Brd Sea Mer Sct))
 
-; A hand is a collection of zero or more cards for each character.
+; A hand is a collection of zero or more cards for each character. Stored as a hash table.
 ; Examples of hands are: the council, each player's village, each player's hand, and the
-; cards available for refreshing the hand.
+; pile available for restocking a hand.
+; It doesn't yet handle cards turned over.
 (define-type Hand (Immutable-HashTable Card Integer))
 
-(define enpty-hand hash)
-
-;-----------------------
-; Score a player against a reference hand; by default, the council
-(: score (->* (Hand) (Hand) Integer))
-(define (score player [ref *council])
-  (hash-sum
-   (hash-mul player ref)))
-
-; Show player scores
-(: scores (-> (Listof Integer)))
-(define (scores)
-  (list (score *village-1 *council)
-        (score *village-2 *council)))
+; Constructor
+(: make-Hand (-> Card Integer Hand))
+(define (make-Hand c n)
+  (hash c n))
 
 ;-----------------------
 ; Utility function
-; random-element :: ∀ a => List a -> a
+; random-element :: ∀ a => [a] -> a
 (: random-element (All (a) (-> (Listof a) a)))
 (define (random-element lst)
   (list-ref lst (random (length lst))))
 
+(: add-hand (-> Hand Hand Hand))
+(define (add-hand h1 h2)
+  (hash-add h1 h2))
+
 ; Deal a new random card
-; deal-card :: Card
 (: deal-card (-> Hand))
 (define (deal-card)
   (hash (random-element card-types) 1))
@@ -66,29 +58,38 @@
     (hash-add (deal-card) h)))
 
 ;-----------------------
-; For a 2-player game, the game state is captured by the following hands:
-; - Council -> 'Council
-; - Player 1's village -> 'Village-1
-; - Player 1's hand cards -> 'Hand-1
-; - Player 2's village -> 'Village-2
-; - Player 2's hand cards -> 'Hand-2
+; Score a player against a reference hand; by default, the council
+(: score (-> Hand Hand Integer))
+(define (score ref player)
+  (hash-sum
+   (hash-mul ref player)))
 
-; Define the hands active in a game
-(define-type Game (Immutable-HashTable Symbol Hand))
-
-; Test data
-(define *council   : Hand (hash 'Blk 1 'War 2 'Brd 3 'Sea 0 'Mer 0 'Sct 0))
-(define *village-1 : Hand (hash 'Blk 1 'War 2 'Sea 2))
-(define *village-2 : Hand (hash 'War 2 'Brd 1 'Mer 1))
-
-; e.g.
-(: initial-state Game)
-(define initial-state (hash 'Council *council
-                            'Village-1 *village-1
-                            'Village-2 *village-2))
+; Show player scores
+(: scores (-> Hand (Listof Hand) (Listof Integer)))
+(define (scores ref villages)
+  (for/list ([v : Hand villages])
+    (score ref v)))
 
 
-;(define-language harald)
+;-----------------------
+; Example data
+
+(define council : Hand
+  (deal-n-cards 6 (hash)))
+
+(define villages : (Listof Hand)
+  (list
+   (deal-n-cards 5 (hash))
+   (deal-n-cards 5 (hash))))
+
+(define hands : (Listof Hand)
+  (list
+   (deal-n-cards 4 (hash))
+   (deal-n-cards 4 (hash))))
+
+(define reserve : Hand
+  (deal-n-cards 4 (hash)))
+
 
 ;========================
 ; Unit tests
