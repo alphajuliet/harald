@@ -40,9 +40,6 @@
 ;-----------------------
 ; Utility functions
 
-(define (map-apply fn-list arg)
-  (map (λ (f) (apply (eval f ns) arg)) fn-list))
-
 ; random-element :: ∀ a. [a] -> a
 #;(: random-element (All (a) (-> (Listof a) a)))
 (define (random-element lst)
@@ -112,7 +109,7 @@
    'Reserve (deal-n-cards 4 (empty-hand))))
 
 ;-----------------------
-; Lens views of the state
+; Lenses for the game state
 (define (council) (hash-ref-lens 'Council))
 (define (council-card t) (lens-compose (hash-ref-lens t) (council)))
 (define (hand n) (lens-compose (list-ref-lens n) (hash-ref-lens 'Hands)))
@@ -155,7 +152,10 @@
   (curry move-card))
 
 ; Swap a card between two hands
-(define (swap-card t lens1 lens2 st) '())
+(define (swap-card t lens1 lens2 st)
+  (let ([c1 (lens-view lens1 st)]
+        [c2 (lens-view lens2 st)])
+    '()))
 
 ; Deal a card into the Reserve
 (define (deal-reserve st) '())
@@ -179,8 +179,10 @@
 (define moves
   (list (curry move-card 'Blk (hand 0) (council))
         (curry move-card 'Blk (hand 0) (village 0))
+        (curry move-card 'Sea (reserve) (hand 0))
         (curry move-card 'War (hand 1) (council))
-        (curry move-card 'War (hand 1) (village 1))))
+        (curry move-card 'War (hand 1) (village 1))
+        (curry move-card 'Mer (reserve) (hand 1))))
 
 ;========================
 ; Unit tests
@@ -193,7 +195,6 @@
     (test-suite
      "Unit tests"
      (check-equal? (+ 2 2) 4)
-     (check-equal? (map-apply `(,sqrt ,(curry + 1) ,(curry * 2)) '(100)) '(10 101 200))
      (check-equal? (score (hash 'Blk 1 'War 3 'Sea 2)
                           (hash 'Blk 1 'War 2 'Brd 3))
                    7)
