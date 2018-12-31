@@ -135,6 +135,8 @@
 ; e.g. (move-card 'Blk (hand 1) (council) s0)
 ; move-card :: Card -> Lens Hand -> Lens Hand -> State -> State
 (define (move-card t src-lens dest-lens st)
+
+  ; Ensure the card is available
   (if (and (hash-has-key? (lens-view src-lens st) t)
            (> (lens-view (lens-compose (hash-ref-lens t) src-lens) st)
               0))
@@ -154,8 +156,9 @@
     s2))
 
 ; Deal a card into the Reserve
-; @@TODO
-(define (deal-reserve st) '())
+; deal-reserve :: State -> State
+(define (deal-reserve st)
+  (lens-transform (reserve) s0 (hash-add (deal-card))))
 
 ;-----------------------
 ; Fold a list of moves over an initial state
@@ -209,7 +212,8 @@
                        (Villages . (#hash() #hash() #hash())))]
              [s1 (move-card 'War (hand 0) (council) s0)]
              [s2 (move-card 'War (hand 1) (village 1) s1)]
-             [s3 (swap-cards 'Blk (hand 0) 'Sea (hand 1) s0)])
+             [s3 (swap-cards 'Blk (hand 0) 'Sea (hand 1) s0)]
+             [s4 (deal-reserve s0)])
 
         ; Test move-card
         (check-equal? (score-state s0) '(0 0 0))
@@ -218,11 +222,13 @@
         (check-exn exn:fail? (λ () (move-card 'Sea (hand 0) (council) s0)))
 
         ; Test swap-cards
-        (check-equal? (hash-count (lens-view (hand 0) s3)) 4)
-        (check-equal? (hash-count (lens-view (hand 1) s3)) 4)
+        (check-equal? (hash-sum (lens-view (hand 0) s3)) 4)
+        (check-equal? (hash-sum (lens-view (hand 1) s3)) 4)
         (check-equal? (lens-view (hand-card 0 'Blk) s3) 1)
-        (check-equal? (lens-view (hand-card 0 'Sea) s3) 1)))
-    
+        (check-equal? (lens-view (hand-card 0 'Sea) s3) 1)
+
+        ; Test deal-reserve
+        (check-equal? (hash-sum (lens-view (reserve) s4)) 5)))
      ))
 
   (run-tests harald-tests))
