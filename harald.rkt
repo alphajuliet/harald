@@ -1,6 +1,7 @@
 #lang racket
 ; harald.rkt
 ; AndrewJ 2018-09-06
+; [i:019824]
 
 ; Imports
 (require racket/hash
@@ -147,7 +148,6 @@
 ; Swap two cards between two hands
 ; i.e. exchange t1 from lens1 with t2 from lens2
 ; swap-cards :: Card -> Lens Hand -> Card -> Lens Hand -> State -> State
-; @@TODO
 (define (swap-cards t1 lens1 t2 lens2 st)
   (let* ([s1 (move-card t1 lens1 lens2 st)]
          [s2 (move-card t2 lens2 lens1 s1)])
