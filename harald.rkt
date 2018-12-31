@@ -45,11 +45,6 @@
 (define (random-element lst)
   (list-ref lst (random (length lst))))
 
-; add-hand :: Hand -> Hand -> Hand
-#;(: add-hand (-> Hand Hand Hand))
-(define (add-hand h1 h2)
-  (hash-add h1 h2))
-
 ; Deal a new random card
 ; deal-card :: Card
 #;(: deal-card (-> Hand))
@@ -110,6 +105,7 @@
 
 ;-----------------------
 ; Lenses for the game state
+
 (define (council) (hash-ref-lens 'Council))
 (define (council-card t) (lens-compose (hash-ref-lens t) (council)))
 (define (hand n) (lens-compose (list-ref-lens n) (hash-ref-lens 'Hands)))
@@ -147,24 +143,26 @@
       ;else
       (error "### Error: card not available to move")))
 
-; Curried version
-(define (move-card-c t src-lens dest-len)
-  (curry move-card))
 
-; Swap a card between two hands
-(define (swap-card t lens1 lens2 st)
-  (let ([c1 (lens-view lens1 st)]
-        [c2 (lens-view lens2 st)])
-    '()))
+; Swap two cards between two hands
+; i.e. exchange t1 from lens1 with t2 from lens2
+; swap-cards :: Card -> Lens Hand -> Card -> Lens Hand -> State -> State
+; @@TODO
+(define (swap-cards t1 lens1 t2 lens2 st)
+  (let* ([s1 (move-card t1 lens1 lens2 st)]
+         [s2 (move-card t2 lens2 lens1 s1)])
+    s2))
 
 ; Deal a card into the Reserve
+; @@TODO
 (define (deal-reserve st) '())
 
 ;-----------------------
 ; Fold a list of moves over an initial state
+; e.g. (apply-moves moves s0)
 ; apply-moves :: [(State -> State)] -> State -> State
-(define (apply-moves lst s0)
-  (foldl (λ (f st) (f st)) s0 lst))
+(define (apply-moves lst init-state)
+  (foldl (λ (f st) (f st)) init-state lst))
 
 ;-----------------------
 ; Example data
@@ -202,7 +200,7 @@
                           (hash 'Blk 1 'War 2 'Brd 3))
                    6)
      (test-suite
-      "States"
+      "Move cards"
       (let* ([s0 #hash((Council . #hash())
                        (Hands . (#hash((Blk . 2) (Mer . 1) (War . 1))
                                  #hash((Mer . 1) (Sea . 1) (War . 2))
@@ -210,13 +208,22 @@
                        (Reserve . #hash((Brd . 1) (Mer . 1) (Sea . 2)))
                        (Villages . (#hash() #hash() #hash())))]
              [s1 (move-card 'War (hand 0) (council) s0)]
-             [s2 (move-card 'War (hand 1) (village 1) s1)])
+             [s2 (move-card 'War (hand 1) (village 1) s1)]
+             [s3 (swap-cards 'Blk (hand 0) 'Sea (hand 1) s0)])
+
+        ; Test move-card
         (check-equal? (score-state s0) '(0 0 0))
         (check-equal? (lens-view (council-card 'War) s1) 1)
         (check-equal? (score-state s2) '(0 1 0))
         (check-exn exn:fail? (λ () (move-card 'Sea (hand 0) (council) s0)))
-        
-        ))))
+
+        ; Test swap-cards
+        (check-equal? (hash-count (lens-view (hand 0) s3)) 4)
+        (check-equal? (hash-count (lens-view (hand 1) s3)) 4)
+        (check-equal? (lens-view (hand-card 0 'Blk) s3) 1)
+        (check-equal? (lens-view (hand-card 0 'Sea) s3) 1)))
+    
+     ))
 
   (run-tests harald-tests))
 
