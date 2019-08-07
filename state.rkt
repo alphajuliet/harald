@@ -24,14 +24,12 @@
 
 (define card-types '(Blk War Brd Sea Mer Sct))
 
-; A hand is a collection of zero or more cards for each character. Stored as a hash table.
-; Examples of hands are: the council, each player's village, each player's hand, and the
-; pile available for restocking a hand.
+(define all-cards '(Blk War Brd Sea Mer Sct BlkX WarX BrdX SeaX MerX SctX))
 
-; Constructor
-; make-hand :: Card -> Integer -> Hand 
-(define (make-Hand c n)
-  (hash c n))
+; A Hand is a collection of zero or more cards for each character. Stored as a hash table.
+; Examples of hands are: the council, each player's village, each player's own hand, and the
+; reserve pile available for restocking a player's hand.
+
 
 ;-----------------------
 ; Composable versions of lens functions. Similar to PureScript lens library functions.
@@ -40,23 +38,36 @@
 (define (over _lens f x) (lens-transform _lens x f))
 (define >>> lens-thrush)
 (define <<< lens-compose)
+(define (view* _lens x)
+  (with-handlers ([exn:fail:contract? (λ (e) 0)])
+    (lens-view _lens x)))
+
+; Game state
+; State :: Hash Card Hand
+(define (empty-state nplayers)
+  (hash 'Council (hash)
+        'Villages (for/list ([i (in-range nplayers)]) (hash))
+        'Hands (for/list ([i (in-range nplayers)]) (hash))
+        'Reserve (hash)))
 
 ; Lenses for the game state
+(define (_card t) (hash-ref-lens t))
 (define _council (hash-ref-lens 'Council))
-(define (_council-card t) (>>> _council (hash-ref-lens t)))
+(define (_council-card t) (>>> _council (_card t)))
 (define (_hand n) (>>> (hash-ref-lens 'Hands) (list-ref-lens n)))
 (define (_hand-card n t) (>>> (_hand n) (hash-ref-lens t)))
-(define (_village n) (>>> (hash-ref-lens 'Villages) (list-ref-lens n)))
-(define (_village-card n t) (>>> (_village n) (hash-ref-lens t)))
+(define _villages (hash-ref-lens 'Villages))
+(define (_village n) (>>> _villages (list-ref-lens n)))
+(define (_village-card n t) (>>> (_village n) (_card t)))
 (define _reserve (hash-ref-lens 'Reserve))
-(define (_reserve-card t) (>>> _reserve (hash-ref-lens t)))
+(define (_reserve-card t) (>>> _reserve (_card t)))
 
 ;-----------------------
 ; Score the current state
 ; score-states :: State -> [Integer]
 (define (score-state st)
-  (scores (hash-ref st 'Council)
-          (hash-ref st 'Villages)))
+  (scores (view _council st)
+          (view _villages st)))
 
 ;-----------------------
 ; Score a player against a reference hand; by default, the council
