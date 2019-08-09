@@ -102,9 +102,9 @@
 ; Game actions
 ; - Init game
 ; - Player turn
-;   - Play hand card to council
-;   - Play hand card to village
-;   - Take card from reserve
+;   1. Play hand card to council
+;   2. Play hand card to village
+;   3. Take card from reserve
 ;
 ; - Turn over cards (Blacksmith effect)
 ; - Return village card (Warrior effect)
@@ -132,7 +132,6 @@
             (deal-n-cards 4 (empty-hand)))
    'Reserve (deal-n-cards 4 (empty-hand))))
 
-
 ;-----------------------
 ; Make a turn with three actions: play one card to council (cc),
 ; one to the village (cv) and take one from the reserve (cr).
@@ -157,28 +156,32 @@
     (turn-over-card (first x) (eval (second x)) state)))
 
 ;-----------------------
-; (War effect) Return a card from any village and replace with a random card
-; return-card :: CardLoc -> State -> State
-(define (return-card _c st)
-  #f)
+; (War effect) Throw away a card from any village and replace with a random card
+; return-card :: Card -> Lens Hand -> State -> State
+(define (return-card c _v st)
+  (~>> st
+       (over (>>> _v (_card c)) sub1)
+       (over _v (hash-add (deal-card)))))
 
 ;-----------------------
 ; (Brd effect) Swap a hand card with a village card
-; swap-hand-card :: CardLoc -> CardLoc -> State -> State
-(define (swap-hand-card _ch _cv st)
-  #f)
+; e.g. (swap-hand-card 'Brd 0 'Mer 1 s0)
+; swap-hand-card :: Card -> Integer -> Card -> Integer -> State -> State
+(define (swap-hand-card ch nh cv nv st)
+  (swap-cards ch (_hand nh) cv (_village nv) st))
 
 ;-----------------------
 ; (Sea effect) Swap a village card with a council card
-; swap-council-card :: CardLoc -> CardLoc -> State -> State
-(define (swap-council-card _cv _cc st)
-  #f)
+; e.g. (swap-council-card 'Brd 0 'Mer s0)
+; swap-council-card :: Card -> Lens Hand -> Card -> Lens Hand -> State -> State
+(define (swap-council-card cv n cc st)
+  (swap-cards cv (_village n) cc _council st))
 
 ;-----------------------
 ; (Mer effect) Swap two village cards
-; swap-village-card :: CardLoc -> CardLoc -> State -> State
-(define (swap-village-card _cv1 _cv2 st)
-  #f)
+; swap-village-card :: Card -> Integer -> Card -> Integer -> State -> State
+(define (swap-village-card cv1 n1 cv2 n2 st)
+  (swap-cards cv1 (_village n1) cv2 (_village n2) st))
 
 
 ;-----------------------
@@ -194,12 +197,8 @@
 (define s0 (init-game 4 #:seed 1))
 
 (define moves
-  (list (curry move-card 'Blk (_hand 0) _council)
-        (curry move-card 'Blk (_hand 0) (_village 0))
-        (curry move-card 'Sea _reserve (_hand 0))
-        (curry move-card 'War (_hand 1) _council)
-        (curry move-card 'War (_hand 1) (_village 1))
-        (curry move-card 'Mer _reserve (_hand 1))))
+  (list (curry make-turn 0 'Mer 'Sea 'Sea)
+        (curry swap-council-card 'Sea 0 'Mer)))
 
 ;========================
 ; Unit tests
@@ -219,7 +218,8 @@
              [s1 (move-card 'War (_hand 1) _council s0)]
              [s2 (move-card 'War (_hand 2) (_village 0) s1)]
              [s3 (swap-cards 'Brd (_hand 0) 'Sea (_hand 1) s0)]
-             [s4 (deal-reserve s0)])
+             [s4 (deal-reserve s0)]
+             [s5 (turn-over-card 'War _council s2)])
 
         ; Test move-card
         (check-equal? (score-state s0) '(0 0 0))
@@ -234,7 +234,14 @@
         (check-equal? (view (_hand-card 0 'Sea) s3) 2)
 
         ; Test deal-reserve
-        (check-equal? (hash-sum (view _reserve s4)) 5)))
+        (check-equal? (hash-sum (view _reserve s4)) 5)
+
+        ; Test turn-over-card
+        (check-equal? (invert 'Sea) 'SeaX)
+        (check-equal? (score-state s5) '(0 0 0))
+
+        ; Encode state to a vector
+        (check-equal? (length (encode-state s0)) 96)))
      ))
 
   (run-tests harald-tests))

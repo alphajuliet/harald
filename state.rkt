@@ -25,6 +25,8 @@
 (define card-types '(Blk War Brd Sea Mer Sct))
 
 (define all-cards '(Blk War Brd Sea Mer Sct BlkX WarX BrdX SeaX MerX SctX))
+(define null-hand (hash 'Blk 0 'War 0 'Brd 0 'Sea 0 'Mer 0 'Sct 0
+                        'BlkX 0 'WarX 0 'BrdX 0 'SeaX 0 'MerX 0 'SctX 0))
 
 ; A Hand is a collection of zero or more cards for each character. Stored as a hash table.
 ; Examples of hands are: the council, each player's village, each player's own hand, and the
@@ -55,19 +57,12 @@
 (define _council (hash-ref-lens 'Council))
 (define (_council-card t) (>>> _council (_card t)))
 (define (_hand n) (>>> (hash-ref-lens 'Hands) (list-ref-lens n)))
-(define (_hand-card n t) (>>> (_hand n) (hash-ref-lens t)))
+(define (_hand-card n t) (>>> (_hand n) (_card t)))
 (define _villages (hash-ref-lens 'Villages))
 (define (_village n) (>>> _villages (list-ref-lens n)))
 (define (_village-card n t) (>>> (_village n) (_card t)))
 (define _reserve (hash-ref-lens 'Reserve))
 (define (_reserve-card t) (>>> _reserve (_card t)))
-
-;-----------------------
-; Score the current state
-; score-states :: State -> [Integer]
-(define (score-state st)
-  (scores (view _council st)
-          (view _villages st)))
 
 ;-----------------------
 ; Score a player against a reference hand; by default, the council
@@ -86,7 +81,24 @@
   (for/list ([v villages])
     (score ref v)))
 
+;-----------------------
+; Score the current state
+; score-states :: State -> [Integer]
+(define (score-state st)
+  (scores (view _council st)
+          (view _villages st)))
 
+;-----------------------
+; Encode the state as a vector
+(define (encode-hand h)
+  (hash-values (hash-add null-hand h)))
+
+(define (encode-state s)
+  (append (encode-hand (hash-ref s 'Council))
+          (flatten (map encode-hand (hash-ref s 'Hands)))
+          (flatten (map encode-hand (hash-ref s 'Villages)))
+          (encode-hand (hash-ref s 'Reserve))))
+  
 ;-----------------------
 (module+ test
   (require rackunit
@@ -101,7 +113,9 @@
                    7)
      (check-equal? (score (hash 'BlkX 1 'War 3 'Sea 2)
                           (hash 'Blk 1 'War 2 'Brd 3))
-                   6)))
+                   6)
+     (check-equal? (score-state (empty-state 4))
+                   '(0 0 0 0))))
 
   (run-tests state-tests))
 
