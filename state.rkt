@@ -8,7 +8,8 @@
          lens/data/list
          lens/data/hash
          threading
-         hash-ext)
+         hash-ext
+         "util.rkt")
 
 ; Exports
 (provide (all-defined-out))
@@ -33,17 +34,6 @@
 ; reserve pile available for restocking a player's hand.
 
 
-;-----------------------
-; Composable versions of lens functions. Similar to PureScript lens library functions.
-(define (view _lens x) (lens-view _lens x))
-(define (at _lens x y) (lens-set _lens y x))
-(define (over _lens f x) (lens-transform _lens x f))
-(define >>> lens-thrush)
-(define <<< lens-compose)
-(define (view* _lens x)
-  (with-handlers ([exn:fail:contract? (λ (e) 0)])
-    (lens-view _lens x)))
-
 ; Game state
 ; State :: Hash Card Hand
 (define (empty-state nplayers)
@@ -53,16 +43,13 @@
         'Reserve (hash)))
 
 ; Lenses for the game state
-(define (_card t) (hash-ref-lens t))
+(define _card hash-ref-lens)
 (define _council (hash-ref-lens 'Council))
-(define (_council-card t) (>>> _council (_card t)))
-(define (_hand n) (>>> (hash-ref-lens 'Hands) (list-ref-lens n)))
-(define (_hand-card n t) (>>> (_hand n) (_card t)))
+(define _hands (hash-ref-lens 'Hands))
+(define (_hand p) (>>> _hands (list-ref-lens p)))
 (define _villages (hash-ref-lens 'Villages))
 (define (_village n) (>>> _villages (list-ref-lens n)))
-(define (_village-card n t) (>>> (_village n) (_card t)))
 (define _reserve (hash-ref-lens 'Reserve))
-(define (_reserve-card t) (>>> _reserve (_card t)))
 
 ;-----------------------
 ; Score a player against a reference hand; by default, the council
